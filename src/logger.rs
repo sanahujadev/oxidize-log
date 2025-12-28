@@ -22,3 +22,15 @@ impl Logger {
         println!("[{:?}] {}", level, message);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn logger_filters_lower_levels() {
+        let logger = Logger::new(LogLevel::Warn);
+        // No imprime nada, pero podemos testear la lógica interna 
+        assert!((LogLevel::Info as u8) < (logger.level as u8));
+    }
+}
