@@ -1,0 +1,27 @@
+{
+  "name": "oxidize-log-dev",
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest"
+    }
+  },
+
+  "postCreateCommand": "cargo install cargo-watch",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb",
+        "usernamehw.errorlens"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode"
+}
