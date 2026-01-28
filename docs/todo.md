@@ -1,158 +1,136 @@
-# 🧭 **Roadmap `oxidize-log` (con progreso marcado)**
+# 🧭 **Roadmap `oxidize-log` — Formato TODO**
 
 Leyenda:  
-- **P0** = esencial  
-- **P1** = importante  
-- **P2** = nice to have  
-- **F** = funcional  
-- **NF** = no funcional  
-- **✔️** = ya construido  
-- **🟡** = parcialmente iniciado  
-- **⬜** = pendiente
+- **[X]** = hecho  
+- **[ ]** = pendiente  
+- **🟡** = en progreso  
+- **P0/P1/P2** = prioridad  
+- **F/NF** = funcional / no funcional  
 
 ---
 
-# 1. Visión general del proyecto
-
-*(No tiene requisitos marcables)*
+# 1. Visión general  
+*(No aplica)*
 
 ---
 
 # 2. Arquitectura general
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R1 | Estructura en capas (core + bindings) | P0 | NF | ⬜ |
-| R2 | Core único de lógica | P0 | NF | ✔️ *(ya tenemos `level.rs`, `logger.rs`, `lib.rs`)* |
+- [ ] **R1 (P0, NF)** Estructura en capas (core + bindings)  
+- [X] **R2 (P0, NF)** Core único de lógica (`level.rs`, `logger.rs`, `lib.rs`)
 
 ---
 
 # 3. Funcionalidades básicas de logging
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R3 | Niveles estándar | P0 | F | ✔️ *(enum LogLevel + tests)* |
-| R4 | API estructurada (mensaje + campos) | P1 | F | ⬜ |
-| R5 | Formato texto simple | P0 | F | 🟡 *(logger imprime texto, falta timestamp y metadatos)* |
-| R6 | Formato JSON | P1 | F | ⬜ |
+- [X] **R3 (P0, F)** Niveles estándar  
+- [ ] **R4 (P1, F)** API estructurada (mensaje + campos)  
+- [🟡] **R5 (P0, F)** Formato texto simple (falta timestamp y metadatos)  
+- [ ] **R6 (P1, F)** Formato JSON  
 
 ---
 
 # 4. Metadatos de contexto
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R7 | Captura de archivo y línea | P0 | F | ⬜ *(requiere macros)* |
-| R8 | Nombre de función opcional | P1 | F | ⬜ |
-| R9 | Metadatos configurables | P2 | F | ⬜ |
+- [ ] **R7 (P0, F)** Captura de archivo y línea (requiere macros)  
+- [ ] **R8 (P1, F)** Nombre de función opcional  
+- [ ] **R9 (P2, F)** Metadatos configurables  
 
 ---
 
 # 5. Colores y salida a consola
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R10 | Colores por nivel | P0 | F | ⬜ |
-| R11 | Desactivar colores | P1 | F | ⬜ |
-| R12 | Temas de color | P2 | F | ⬜ |
+- [ ] **R10 (P0, F)** Colores por nivel  
+- [ ] **R11 (P1, F)** Desactivar colores  
+- [ ] **R12 (P2, F)** Temas de color  
 
 ---
 
 # 6. Sinks / Destinos
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R13 | Sink consola | P0 | F | 🟡 *(logger imprime en consola, falta modularizar como sink)* |
-| R14 | Sink archivo simple | P0 | F | ⬜ |
-| R15 | Rotación de archivos | P1 | F | ⬜ |
-| R16 | Sink CloudWatch | P2 | F | ⬜ |
-| R17 | Múltiples sinks | P1 | F | ⬜ |
-| R18 | Filtros por sink | P2 | F | ⬜ |
+- [🟡] **R13 (P0, F)** Sink consola (mínimo hecho, falta modularización completa)  
+- [ ] **R14 (P0, F)** Sink archivo simple  
+- [ ] **R15 (P1, F)** Rotación de archivos  
+- [ ] **R16 (P2, F)** Sink CloudWatch  
+- [ ] **R17 (P1, F)** Múltiples sinks  
+- [ ] **R18 (P2, F)** Filtros por sink  
 
 ---
 
 # 7. Concurrencia y seguridad
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R19 | Seguridad en un proceso | P0 | NF | ⬜ |
-| R20 | Escritura atómica en archivo | P0 | NF | ⬜ |
-| R21 | Varios procesos escribiendo | P2 | NF | ⬜ |
-| R22 | Buffering vs síncrono | P1 | F | ⬜ |
+- [ ] **R19 (P0, NF)** Seguridad en un proceso  
+- [ ] **R20 (P0, NF)** Escritura atómica en archivo  
+- [ ] **R21 (P2, NF)** Varios procesos escribiendo  
+- [ ] **R22 (P1, F)** Buffering vs síncrono  
 
 ---
 
 # 8. Bindings JS/TS
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R23 | API JS amigable | P1 | F | ⬜ |
-| R24 | Bindings basados en core | P1 | NF | ⬜ |
-| R25 | Soporte Node.js | P1 | NF | ⬜ |
-| R26 | Errores traducidos a JS | P1 | F | ⬜ |
+- [ ] **R23 (P1, F)** API JS amigable  
+- [ ] **R24 (P1, NF)** Bindings basados en core  
+- [ ] **R25 (P1, NF)** Soporte Node.js  
+- [ ] **R26 (P1, F)** Errores traducidos a JS  
 
 ---
 
 # 9. Bindings Java
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R27 | API Java sencilla | P1 | F | ⬜ |
-| R28 | Integración JNI | P1 | NF | ⬜ |
-| R29 | Errores traducidos a Java | P1 | F | ⬜ |
-| R30 | Empaquetado Maven/Gradle | P2 | NF | ⬜ |
+- [ ] **R27 (P1, F)** API Java sencilla  
+- [ ] **R28 (P1, NF)** Integración JNI  
+- [ ] **R29 (P1, F)** Errores traducidos a Java  
+- [ ] **R30 (P2, NF)** Empaquetado Maven/Gradle  
 
 ---
 
 # 10. Configuración
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R31 | Configuración programática | P0 | F | ⬜ *(lo hablaste, falta implementarlo)* |
-| R32 | Configuración por archivo | P2 | F | ⬜ |
-| R33 | Niveles por módulo | P2 | F | ⬜ |
+- [ ] **R31 (P0, F)** Configuración programática (builder pattern)  
+- [ ] **R32 (P2, F)** Configuración por archivo  
+- [ ] **R33 (P2, F)** Niveles por módulo  
 
 ---
 
 # 11. Rendimiento y robustez
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R34 | Fast path eficiente | P1 | NF | 🟡 *(ya filtras por nivel, falta lazy evaluation)* |
-| R35 | Medición de rendimiento | P2 | NF | ⬜ |
-| R36 | No panics en producción | P0 | NF | ✔️ *(tu logger actual no hace panic)* |
+- [🟡] **R34 (P1, NF)** Fast path eficiente (falta lazy evaluation)  
+- [ ] **R35 (P2, NF)** Medición de rendimiento  
+- [X] **R36 (P0, NF)** No panics en producción  
 
 ---
 
 # 12. Developer Experience (DX)
 
-| ID | Requisito | Prioridad | Tipo | Estado |
-|----|-----------|-----------|------|--------|
-| R37 | Macros amigables | P0 | F | ⬜ |
-| R38 | Documentación clara | P1 | NF | ⬜ |
-| R39 | Defaults sensatos | P0 | NF | 🟡 *(init_default existe, falta formato y sinks)* |
+- [ ] **R37 (P0, F)** Macros amigables  
+- [ ] **R38 (P1, NF)** Documentación clara  
+- [🟡] **R39 (P0, NF)** Defaults sensatos (falta formato y sinks)
 
 ---
 
-# 🧠 Resumen de progreso real
+# 🧠 Resumen
 
-### ✔️ Completado
-- R2: Core inicial  
-- R3: Niveles  
-- R36: No panics  
-- Tests unitarios básicos  
-- Estructura inicial del crate  
-- Logger básico con filtrado  
+### ✔️ Hecho
+- Core inicial  
+- Niveles  
+- No panics  
+- Tests básicos  
+- Logger con filtrado  
 
 ### 🟡 En progreso
-- R5: Formato texto (mínimo)  
-- R13: Consola (mínimo)  
-- R34: Fast path básico  
-- R39: Defaults iniciales  
+- Formato texto  
+- Sink consola  
+- Fast path  
+- Defaults  
 
 ### ⬜ Pendiente
-Todo lo demás: configuración, sinks, macros, colores, bindings, etc.
-
----
-
-Si quieres, puedo ayudarte a **convertir este roadmap en un `ROADMAP.md` oficial** dentro del repo, o incluso en **issues de GitHub** listos para trabajar en ellos.
+- Metadatos  
+- Macros  
+- Config builder  
+- Sinks avanzados  
+- Colores  
+- JSON  
+- Bindings  
+- Concurrencia  
+- Rotación  
+- Documentación  

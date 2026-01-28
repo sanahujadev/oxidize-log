@@ -1,129 +1,141 @@
-# Next Session — Objetivos inmediatos de oxidize-log
+# **next-session.md**
 
-Este documento define los **2–3 pasos siguientes** del proyecto, con un enfoque claro, concreto y accionable.  
-La idea es avanzar en bloques pequeños pero profundos, manteniendo TDD y una arquitectura limpia.
-
----
-
-## 🎯 Objetivo 1 — Introducir `LoggerConfig` y `Environment` (P0)
-
-### ¿Por qué este paso?
-Hasta ahora el logger tiene un comportamiento fijo.  
-Para avanzar hacia un sistema real necesitamos una **capa de configuración** que permita:
-
-- elegir nivel mínimo
-- activar/desactivar colores
-- seleccionar sinks (por ahora solo consola)
-- preparar el terreno para dev/staging/prod
-
-Esto NO debe ir dentro del core del logger, sino en un módulo dedicado.
-
-### Tareas concretas
-- Crear archivo `src/config.rs`
-- Definir:
-  ```rust
-  pub enum Environment { Dev, Staging, Prod }
-  ```
-- Definir:
-  ```rust
-  pub struct LoggerConfig {
-      pub level: LogLevel,
-      pub colors: bool,
-      pub sinks: Vec<SinkConfig>, // por ahora solo Console
-  }
-  ```
-- Implementar:
-  ```rust
-  impl LoggerConfig {
-      pub fn from_env(env: Environment) -> Self { ... }
-  }
-  ```
-- Añadir tests unitarios:
-  - `config_for_dev_has_debug_and_colors`
-  - `config_for_staging_has_info_no_colors`
-  - `config_for_prod_has_warn_no_colors`
-
-### Resultado esperado
-Un módulo de configuración sólido, testeado y listo para integrarse con el logger.
+## **🎯 Objetivo general de la próxima sesión**
+Evolucionar el logger desde un sistema básico con sinks hacia un **logger profesional**, capaz de incluir metadatos (timestamp, file, line), formateo flexible y configuración sobrescribible.
 
 ---
 
-## 🎯 Objetivo 2 — Integrar `LoggerConfig` en `Logger::init` (P0)
+## **1. Introducir `LogRecord` como estructura central del logging**
+Actualmente `Sink::log` recibe:
 
-### ¿Por qué este paso?
-Ahora mismo `Logger::init_default()` crea un logger fijo.  
-Queremos que el logger pueda inicializarse con una configuración real.
+```rust
+fn log(&self, level: LogLevel, message: &str);
+```
 
-### Tareas concretas
-- Modificar `Logger` para aceptar `LoggerConfig`
-- Añadir:
-  ```rust
-  pub fn init(config: LoggerConfig) -> Self
-  ```
-- Ajustar el filtrado de niveles para usar `config.level`
-- Añadir tests:
-  - `logger_respects_configured_level`
-  - `logger_initializes_with_colors_flag` (aunque aún no se usen)
+Esto es insuficiente para un logger serio.  
+El siguiente paso es introducir:
 
-### Resultado esperado
-El logger ya no es rígido: puede configurarse desde fuera y se prepara para soportar sinks y colores.
+```rust
+pub struct LogRecord<'a> {
+    pub level: LogLevel,
+    pub message: &'a str,
+    pub file: &'a str,
+    pub line: u32,
+    pub timestamp: DateTime<Utc>,
+}
+```
 
----
-
-## 🎯 Objetivo 3 — Crear el primer `Sink`: ConsoleSink (P0)
-
-### ¿Por qué este paso?
-El logger actual imprime directamente a consola.  
-Eso está bien para un prototipo, pero no para un sistema modular.
-
-Necesitamos separar:
-
-- **core** → decide qué log se emite  
-- **sink** → decide dónde se escribe  
-
-### Tareas concretas
-- Crear archivo `src/sink.rs`
-- Definir:
-  ```rust
-  pub enum SinkConfig {
-      Console,
-  }
-  ```
-- Crear trait:
-  ```rust
-  pub trait Sink {
-      fn write(&self, record: &LogRecord);
-  }
-  ```
-- Crear `ConsoleSink`
-- Modificar `Logger` para:
-  - almacenar una lista de sinks
-  - enviar cada log a cada sink
-
-### Tests necesarios
-- `console_sink_writes_to_stdout` (capturando salida)
-- `logger_sends_record_to_all_sinks` (aunque solo haya uno)
-
-### Resultado esperado
-El logger deja de imprimir directamente y pasa a usar un sistema extensible de sinks.
+### **Motivación**
+- Permite añadir timestamp  
+- Permite capturar file/line automáticamente  
+- Permite formateo flexible  
+- Permite sinks avanzados (JSON, archivo, remoto…)  
+- Separa datos del mensaje del formateo
 
 ---
 
-# 🧩 Resumen de la sesión siguiente
+## **2. Actualizar el trait `Sink` para recibir `LogRecord`**
+Nuevo trait:
 
-En la próxima sesión construiremos:
+```rust
+pub trait Sink {
+    fn log(&self, record: &LogRecord);
+    fn as_any(&self) -> &dyn Any;
+}
+```
 
-1. **`LoggerConfig` + `Environment`**  
-2. **Integración de configuración en `Logger::init`**  
-3. **Primer sink real: `ConsoleSink`**
+### **Impacto**
+- ConsoleSink deberá formatear el record  
+- MockSink deberá almacenar records completos  
+- Logger deberá construir el record antes de delegar  
 
-Con estos tres pasos, tu logger pasa de ser un prototipo a tener una **arquitectura real**, modular, extensible y preparada para crecer hacia:
+---
 
-- colores  
-- sinks múltiples  
-- rotación  
-- CloudWatch  
-- macros  
-- bindings JS/Java  
+## **3. Añadir macros de logging (`info!`, `warn!`, etc.)**
+Estas macros capturarán automáticamente:
 
-Todo manteniendo TDD.
+- `file!()`
+- `line!()`
+- `message`
+- nivel
+
+Ejemplo:
+
+```rust
+info!("User {} logged in", user_id);
+```
+
+Internamente construirá un `LogRecord`.
+
+### **Motivación**
+- API ergonómica  
+- Captura automática de metadatos  
+- Igual que `log` o `tracing`  
+
+---
+
+## **4. Añadir timestamp automático**
+Usaremos `chrono` o `time` (decidiremos en sesión).
+
+Formato inicial:
+
+```
+2026-01-28T23:33:12Z
+```
+
+---
+
+## **5. Añadir builder pattern a `LoggerConfig`**
+Permitir:
+
+```rust
+LoggerConfig::from_env(Environment::Dev)
+    .with_level(LogLevel::Warn)
+    .with_colors(false)
+    .with_sinks(vec![SinkConfig::Console]);
+```
+
+### **Motivación**
+- Overrides limpios  
+- Config flexible  
+- No depender solo del entorno  
+
+---
+
+## **6. Tests necesarios**
+- Logger construye correctamente un `LogRecord`  
+- Macros capturan file/line  
+- Timestamp existe  
+- ConsoleSink formatea correctamente  
+- MockSink recibe records completos  
+- Config builder sobrescribe valores  
+
+---
+
+## **7. Resultado esperado al final de la sesión**
+Un logger que imprime algo así:
+
+```
+2026-01-28T23:33:12Z [INFO] (src/main.rs:42) User logged in
+```
+
+Y con configuración flexible:
+
+```rust
+LoggerConfig::from_env(Environment::Dev)
+    .with_level(LogLevel::Error)
+    .with_colors(true)
+    .with_sinks(vec![SinkConfig::Console]);
+```
+
+---
+
+## **8. Preparado para siguientes fases**
+Una vez completado este objetivo, estaremos listos para:
+
+- `FileSink`
+- `JsonSink`
+- `RemoteSink`
+- Rotación de archivos
+- Formatos personalizados
+- Integración con tracing
