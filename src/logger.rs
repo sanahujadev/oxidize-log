@@ -1,20 +1,19 @@
-use crate::LogLevel;
+use crate::{LogLevel, Environment, LoggerConfig};
 
 pub struct Logger {
-    level: LogLevel,
+    pub config: LoggerConfig,
 }
 
 impl Logger {
-    pub fn new(level: LogLevel) -> Self {
-        Self { level }
-    }
+    pub fn init(config: LoggerConfig) -> Self { Self { config } }
 
     pub fn init_default() -> Self {
-        Self::new(LogLevel::Info)
+        let config = LoggerConfig::from_env(Environment::Dev);
+        Self::init(config) 
     }
 
     pub fn log(&self, level: LogLevel, message: &str) {
-        if (level as u8) < (self.level as u8) {
+        if (level as u8) < (self.config.level as u8) {
             return;
         }
 
@@ -26,11 +25,24 @@ impl Logger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+    use crate::{LoggerConfig, Environment, LogLevel};
+
     #[test]
-    fn logger_filters_lower_levels() {
-        let logger = Logger::new(LogLevel::Warn);
-        // No imprime nada, pero podemos testear la lógica interna 
-        assert!((LogLevel::Info as u8) < (logger.level as u8));
+    fn logger_respects_configured_level() {
+        let config = LoggerConfig::from_env(Environment::Prod); // WARN+
+        let logger = Logger::init(config);
+
+        assert!(LogLevel::Info < logger.config.level); // INFO < WARN
+        assert!(LogLevel::Error >= logger.config.level);
+    }
+
+    #[test]
+    fn logger_initializes_with_config() {
+        let config = LoggerConfig::from_env(Environment::Dev);
+        let logger = Logger::init(config.clone());
+
+        assert_eq!(logger.config.level, config.level);
+        assert_eq!(logger.config.colors, config.colors);
+        assert_eq!(logger.config.sinks, config.sinks);
     }
 }
