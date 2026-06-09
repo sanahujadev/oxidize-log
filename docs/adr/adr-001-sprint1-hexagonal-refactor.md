@@ -820,6 +820,42 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 
 ---
 
+## ✅ Qué resuelve este ADR (Sprint 1)
+
+* Arquitectura hexagonal con cuatro capas (`domain`, `ports`, `app`, `adapters`) y separación clara de responsabilidades.
+* Tres traits como puertos: `Sink`, `Formatter`, `Filter`, todos `Send + Sync`.
+* Logger orquestador puro que no conoce formatos ni I/O, solo dominio y puertos.
+* Fast path real (R34): `FnOnce() -> String` solo se evalúa si los filtros lo permiten.
+* Errores tipados (R36): `LogError` manual, sin `unwrap`/`panic!` en dominio/puertos/app.
+* Concurrencia segura (R19): `Send + Sync` en traits; sincronización delegada a adaptadores.
+* Atomicidad de escritura (R20): garantizada por `Mutex` en sinks que escriben a `Write`.
+* R39 (Default sensato): `Logger::default().info("hola")` funciona.
+* R2 (Core único sin duplicación): lógica en Rust, futuros bindings solo traducirán.
+* R1 (Separación en capas): a nivel arquitectónico; workspace físico cuando haya bindings.
+* R13 (Sink consola): `ConsoleSink` implementado con `Formatter` y `Write` inyectables.
+* R5 (Formato texto): `SimpleTextFormatter`, mismo output que el prototipo.
+* R33 (Niveles por módulo): preparado con trait `Filter` y `LevelFilter`.
+* R17 (Múltiples sinks): el `Logger` ya acepta `Vec<Arc<dyn Sink>>`.
+* API bindings-friendly: sin genéricos, `Default`, value objects `Clone + Send + Sync`.
+* Compatibilidad con API antigua: `LoggerConfig`, `Environment`, `SinkConfig` y `Logger::init` se conservan como fachada.
+* Cero dependencias nuevas: `thiserror` rechazado, `LogError` manual, `Cargo.toml` intacto.
+* 20 tests TDD que definen el criterio de cierre del sprint.
+
+---
+
+## ❌ Qué NO resuelve este ADR (queda fuera del Sprint 1)
+
+* No implementa ninguna feature nueva visible al usuario (sin colores, sin JSON, sin archivos, sin rotación, sin CloudWatch, sin macros, sin captura de metadatos).
+* No entrega bindings a JS/TS ni Java (ni siquiera el workspace).
+* No hace benchmarks ni optimizaciones de rendimiento más allá del fast-path funcional.
+* No migra a `no_std`.
+* No cambia el formato de salida respecto al prototipo (sigue siendo `[NIVEL] mensaje`).
+* No resuelve el problema de `&'static str` para bindings futuros (queda documentado y diferido a PDR-002).
+* No implementa filtros avanzados (solo `LevelFilter` por nivel mínimo).
+* No soporta múltiples procesos escribiendo al mismo archivo (R21).
+
+--
+
 ## Historial de revisión
 
 > Bloque nuevo, no presente en el template original. Rastreo de iteraciones de revisión mientras el ADR está abierto. Se conserva al cerrar el ADR.
