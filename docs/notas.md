@@ -1,2 +1,0 @@
-- Decorator para loguear más que el [level] podemos loguear timestamp, file that called, line that called 
-- config customizable, ahora mismo decir que es env dev es suficiente para autoconfigurarlo todo

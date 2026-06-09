@@ -1,52 +1,74 @@
 # oxidize-log
 
-**oxidize-log** es un sistema de logging multiplataforma con un core único en Rust y bindings para JavaScript/TypeScript y Java.  
-Está diseñado para ofrecer alto rendimiento, seguridad en concurrencia, configuración flexible y una experiencia de desarrollo moderna.
+**oxidize-log** es un núcleo (core) de logging de alto rendimiento escrito en Rust. Este repositorio actualmente contiene la base inicial del logger en Rust, listo para ser utilizado como base de futuros bindings multiplataforma.
 
-## 🚀 Objetivo
+Para conocer la visión completa del proyecto y el roadmap de desarrollo, consulta el documento de [Roadmap](file:///home/zitrojj/dev/pro/oxidize-log/docs/roadmap.md).
 
-Construir un logger profesional que pueda utilizarse de forma consistente en múltiples lenguajes, manteniendo un único núcleo de lógica:
+---
 
-- Core en Rust: niveles, formateo, sinks, filtros, concurrencia.
-- Bindings para JS/TS (Node.js inicialmente).
-- Bindings para Java (vía JNI).
+## 📦 Estado Actual del Proyecto
 
-## ✨ Características previstas (roadmap resumido)
+Actualmente, el proyecto se encuentra en su fase inicial con un core mínimo implementado en Rust. La estructura real del repositorio es:
 
-- Niveles estándar: TRACE, DEBUG, INFO, WARN, ERROR, FATAL.
-- Formato texto legible y formato JSON estructurado.
-- Metadatos automáticos: timestamp, nivel, archivo, línea, módulo.
-- Colores ANSI configurables.
-- Sinks múltiples: consola, archivo, rotación, CloudWatch (futuro).
-- Concurrencia segura y escritura atómica por línea.
-- API consistente en Rust, JS/TS y Java.
-- Configuración programática y por archivo (opcional).
-- Macros amigables: `info!`, `error!`, etc.
+- **`/src`**: Módulos iniciales del logger (`config`, `level`, `logger`, `sink`).
+- **`/examples`**: Un ejemplo de integración manual (`test.rs`).
+- **`/docs`**: Documentación de desarrollo, notas y roadmap.
 
-## 📦 Estado actual
+---
 
-Este repositorio contiene la estructura inicial del proyecto y el núcleo mínimo para comenzar a construir el logger.
+## 🛠️ Requisitos de Ejecución
 
-## 🛠️ Estructura del proyecto
+Para desarrollar y ejecutar los comandos de este proyecto sin necesidad de instalar Rust de forma local, el entorno está completamente contenedorizado con **Docker** y **Docker Compose**.
 
+### Requisitos locales en tu máquina:
+- Docker
+- Docker Compose
+
+---
+
+## 🚀 Cómo Empezar y Comandos Útiles
+
+El proyecto cuenta con un script unificado (`run.sh`) que automatiza el ciclo de desarrollo ejecutando Cargo dentro de contenedores efímeros con caché persistente para agilizar las compilaciones consecutivas.
+
+### 1. Ejecutar el ejemplo de desarrollo
+Compila y ejecuta el ejemplo ubicado en `examples/test.rs`:
 ```bash
-oxidize-log/
- ├── logger-core/      # Core en Rust (este repo)
- ├── bindings-js/      # Bindings JS/TS (futuro)
- └── bindings-java/    # Bindings Java (futuro)
+./run.sh dev
 ```
 
-## 🧪 Ejemplo de uso (futuro)
+### 2. Ejecutar las pruebas unitarias y de integración
+Corre la suite completa de tests definidos en el core:
+```bash
+./run.sh test
+```
+
+### 3. Ejecutar flujo de CI local
+Ejecuta la suite de tests y posteriormente compila y corre el ejemplo de prueba:
+```bash
+./run.sh ci
+```
+
+---
+
+## 🧪 Ejemplo de Uso Actual
+
+A día de hoy, el logger se inicializa manualmente configurando sus destinos (sinks) y niveles de log de la siguiente manera:
 
 ```rust
-use oxidize_log::{info, Logger};
+use oxidize_log::{Logger, LoggerConfig, LogLevel, SinkConfig};
 
 fn main() {
-    Logger::init_default();
-    info!("Hola desde oxidize-log", { "user": "jose" });
+    // 1. Definir la configuración del Logger
+    let config = LoggerConfig {
+        level: LogLevel::Debug,
+        colors: true,
+        sinks: vec![SinkConfig::Console],
+    };
+
+    // 2. Inicializar el logger global
+    let logger = Logger::init(config);
+
+    // 3. Registrar un mensaje
+    logger.log(LogLevel::Info, "Hola desde oxidize-log inicializado de forma manual");
 }
 ```
-
-## 📄 Licencia
-
-MIT o Apache-2.0 (por decidir).

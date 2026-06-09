@@ -1,1 +1,9 @@
+#
+# Cargo
+#
 target
+
+#
+# Playground
+#
+.playground

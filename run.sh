@@ -33,6 +33,6 @@ else
 fi
 
 # Ejecutar docker compose
-COMMAND="cargo ${SUFFIX}"
-echo "🚀 Ejecutando: ${COMMAND}"
+COMMAND="docker compose run --rm app sh -c \"cargo ${SUFFIX}\""
+echo "🚀 Ejecutando en Docker: ${COMMAND}"
 eval "$COMMAND"

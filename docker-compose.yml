@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .:/usr/src/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+    working_dir: /usr/src/app
+    environment:
+      - CARGO_HOME=/usr/local/cargo
+
+volumes:
+  cargo-registry:
+  cargo-git:
