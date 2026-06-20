@@ -1,14 +1,10 @@
-//! oxidize-log
-//!
-//! Core de logging multiplataforma escrito en Rust.
-//! Este módulo inicial define la estructura base del proyecto.
+#![deny(warnings)]
+pub mod domain;
+pub mod ports;
+pub mod adapters;
+pub mod app;
 
-pub mod level;
-pub mod logger;
-pub mod config;
-pub mod sink;
-
-pub use level::LogLevel;
-pub use logger::Logger;
-pub use config::{Environment, LoggerConfig, SinkConfig};
-pub use sink::{Sink, ConsoleSink, build_sinks};
+pub use domain::{LogLevel, LogEvent, Metadata, LogError};
+pub use ports::{Sink, Formatter, Filter};
+pub use adapters::{ConsoleSink, SimpleTextFormatter};
+pub use app::{Logger, LoggerBuilder, LoggerConfig, Environment, SinkConfig, LevelFilter};
