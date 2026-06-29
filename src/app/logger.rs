@@ -39,8 +39,20 @@ impl Logger {
         match self.last_error.lock() {
             Ok(mut slot) => *slot = Some(err),
             Err(poisoned) => {
+                // Recuperación defensiva (Qwen Ajuste #3):
+                // un Mutex se envenena si quien lo sostenía hizo panic.
+                // En producción no debería ocurrir (criterio "sin panic"
+                // en domain/ports/app), pero si pasa, no propagamos el
+                // envenenamiento: rescatamos el error previo, lo volcamos
+                // a stderr, y guardamos el nuevo.
                 let mut slot = poisoned.into_inner();
-                *slot = Some(LogError::Config("previous sink error poisoned the lock"));
+                let prev = slot.take();
+                eprintln!(
+                    "oxidize-log: mutex poisoned during error recording. \
+                     Previous error: {:?}. New error: {:?}",
+                    prev, err
+                );
+                *slot = Some(err);
             }
         }
     }
@@ -162,18 +174,30 @@ mod tests {
 
     #[test]
     fn logger_default_emite_a_writer_capturado() {
-        let formatter = Arc::new(crate::adapters::text_format::SimpleTextFormatter);
+        use std::io::Write;
+        use crate::adapters::{console::ConsoleSink, text_format::SimpleTextFormatter};
+        use crate::app::config::LoggerBuilder;
+
+        // Capturamos la salida en un Vec<u8> compartido.
         let written_data = Arc::new(Mutex::new(Vec::new()));
-        let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn std::io::Write + Send + Sync>));
 
-        let sink = Arc::new(crate::adapters::console::ConsoleSink::with_writer(formatter, writer));
+        // Adaptador: VecWriter implementa Write y es seguro para concurrencia.
+        let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn Write + Send + Sync>));
 
+        let formatter = Arc::new(SimpleTextFormatter);
+        let sink = Arc::new(ConsoleSink::with_writer(formatter, writer));
+
+        // API PÚBLICA: añadir un sink reemplaza el default.
+        // (Corrección B: ya no hay doble sink, ya no se contamina stdout.)
         let logger = LoggerBuilder::new().sink(sink).build();
 
         logger.info(|| "hola".to_string());
 
-        let data = written_data.lock().unwrap();
-        assert_eq!(std::str::from_utf8(&data).unwrap(), "[INFO] hola\n");
+        let data = written_data.lock().expect("Mutex poisoned only si otro test panicó");
+        assert_eq!(
+            std::str::from_utf8(&data).expect("output debe ser UTF-8 válido"),
+            "[INFO] hola\n"
+        );
     }
 
     #[test]

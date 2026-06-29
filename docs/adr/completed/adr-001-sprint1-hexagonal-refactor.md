@@ -4,13 +4,14 @@
 > Creado por el agente `architect` (MiniMax). Nunca se edita — si la decisión cambia, se abre un nuevo ADR
 > que referencia y supera a este.
 >
-> **Estado:** `en implementación` (iteración 2 — APROBADO CONDICIONAL Qwen)
-> **Fecha de decisión:** 2026-06-09
-> **Revisor:** Qwen (Arquitecto Segundo)
+> **Estado:** `aprobado` (iteración 3 — APROBADO DEFINITIVO tras correcciones de agy-desktop)
+> **Fecha de decisión:** 2026-06-25
+> **Revisor:** Qwen (Arquitecto Segundo) & agy-desktop (Arquitecto Principal)
 > **Iteraciones anteriores:**
 > - [`adr-001-sprint1-hexagonal-refactor.v0.md`](adr-001-sprint1-hexagonal-refactor.v0.md) — propuesta inicial
 > - [`adr-001-sprint1-hexagonal-refactor.v1.md`](adr-001-sprint1-hexagonal-refactor.v1.md) — iteración 1 (resolución C1, C2, C3, I1–I4, M1, M2)
-> - **Esta versión (v2)**: iteración 2 — corrección de 3 errores técnicos, 4 gaps de especificación y 7 observaciones de coherencia detectadas en la segunda lectura de Qwen
+> - [`adr-001-sprint1-hexagonal-refactor.v2.md`](adr-001-sprint1-hexagonal-refactor.v2.md) — iteración 2 (versión condicional de Qwen)
+> - **Esta versión (v3)**: iteración 3 — rediseño final del Builder (Bugs #1 y #2) y robustecimiento de record_error (Ajuste #3)
 >
 > **Sprint asociado:** Sprint 1 — *Hexagonal Refactor (sin features nuevas)*
 
@@ -282,15 +283,21 @@ impl Logger {
     /// Registra un error de un sink. R36: nunca panics; degrada con gracia.
     /// El `Mutex` puede envenenarse sólo si un `panic!` ocurrió mientras se
     /// sostenía el lock; eso sería una violación del criterio "sin panic en
-    /// producción". En ese caso, lo recuperamos devolviendo el `None` previo
-    /// para no propagar el envenenamiento.
+    /// producción". En ese caso, lo recuperamos: rescatamos el error previo,
+    /// lo volcamos a stderr, y guardamos el nuevo error.
     fn record_error(&self, err: LogError) {
         match self.last_error.lock() {
             Ok(mut slot) => *slot = Some(err),
             Err(poisoned) => {
-                // Recuperación defensiva: extraemos el guard aunque esté envenenado.
+                // Recuperación defensiva (Ajuste #3):
                 let mut slot = poisoned.into_inner();
-                *slot = Some(LogError::Config("previous sink error poisoned the lock"));
+                let prev = slot.take();
+                eprintln!(
+                    "oxidize-log: mutex poisoned during error recording. \
+                     Previous error: {:?}. New error: {:?}",
+                    prev, err
+                );
+                *slot = Some(err);
             }
         }
     }
@@ -341,52 +348,84 @@ impl Filter for LevelFilter {
 ```rust
 // app/config.rs
 pub struct LoggerBuilder {
-    filters: Vec<Arc<dyn Filter>>,
-    sinks:   Vec<Arc<dyn Sink>>,
+    /// El filtro de nivel mínimo. Si es None al llamar a `build()`,
+    /// se resuelve a `LevelFilter::new(LogLevel::Info)` (R39).
+    /// Reemplazable: la última llamada a `.level()` gana.
+    level_filter: Option<Arc<dyn Filter>>,
+    /// Filtros adicionales del usuario (custom). Se evalúan después
+    /// del `level_filter` con `.all()`, así que basta con que uno
+    /// rechace para que el log no se emita.
+    extra_filters: Vec<Arc<dyn Filter>>,
+    /// Sinks configurados. Si está vacío al llamar a `build()`,
+    /// se inyecta `ConsoleSink::new(SimpleTextFormatter)` por defecto (R39).
+    /// Cualquier `.sink()` añade, y se respeta la lista del usuario.
+    sinks: Vec<Arc<dyn Sink>>,
 }
 
 impl LoggerBuilder {
-    /// Constructor con default sensato (R39) — Qwen S1.
+    /// Estado vacío: defaults se resuelven en `build()`.
     pub fn new() -> Self {
         Self {
-            filters: vec![Arc::new(LevelFilter::new(LogLevel::Info))],
-            sinks:   vec![Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter)))],
+            level_filter: None,
+            extra_filters: vec![],
+            sinks: vec![],
         }
     }
 
-    pub fn filter(mut self, f: Arc<dyn Filter>) -> Self {
-        self.filters.push(f);
+    /// Fija el nivel mínimo. **Reemplaza** cualquier valor anterior.
+    pub fn level(mut self, level: LogLevel) -> Self {
+        self.level_filter = Some(Arc::new(LevelFilter::new(level)));
         self
     }
 
+    /// Añade un filtro custom (se acumula).
+    pub fn filter(mut self, f: Arc<dyn Filter>) -> Self {
+        self.extra_filters.push(f);
+        self
+    }
+
+    /// Añade un sink (se acumula).
     pub fn sink(mut self, s: Arc<dyn Sink>) -> Self {
         self.sinks.push(s);
         self
     }
 
-    /// Atajo: ajusta el `LevelFilter` por defecto al nivel indicado.
-    /// Si ya hay filtros configurados, añade un `LevelFilter` adicional.
-    /// Para control fino, usar `.filter(Arc::new(LevelFilter::new(level)))` directamente.
-    pub fn level(mut self, level: LogLevel) -> Self {
-        self.filters.push(Arc::new(LevelFilter::new(level)));
-        self
-    }
-
     pub fn build(self) -> Logger {
+        // Resolver level_filter (R39: Info por defecto)
+        let level_filter = self.level_filter
+            .unwrap_or_else(|| Arc::new(LevelFilter::new(LogLevel::Info)));
+
+        // Componer la lista de filtros: level primero, extras después.
+        // `Logger::log` evalúa con `.all()`, así que el orden no afecta
+        // la decisión final, pero ponemos el nivel primero porque es
+        // el caso más común de fast-path.
+        let mut filters = Vec::with_capacity(1 + self.extra_filters.len());
+        filters.push(level_filter);
+        filters.extend(self.extra_filters);
+
+        // Resolver sinks (R39: ConsoleSink por defecto si la lista está vacía)
+        let sinks = if self.sinks.is_empty() {
+            vec![Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter))) as Arc<dyn Sink>]
+        } else {
+            self.sinks
+        };
+
         Logger {
-            filters: self.filters,
-            sinks:   self.sinks,
+            filters,
+            sinks,
             last_error: Arc::new(Mutex::new(None)),
         }
     }
 
-    /// Fachada de compatibilidad: convierte un `LoggerConfig` (antiguo) en un builder.
-    /// — Qwen C3
+    /// Fachada de compatibilidad (Qwen C3, Opción A).
+    /// Ahora coherente con el nuevo modelo: empezamos con `level` fijado
+    /// y sinks vacíos; `build()` resuelve los defaults si hace falta.
     pub fn from_config(config: LoggerConfig) -> Self {
-        // Estrategia: si config.sinks contiene Console, añadimos un ConsoleSink con
-        // SimpleTextFormatter (o un "raw formatter" sin colores, ya que colors=false
-        // se ignora en Sprint 1). El nivel mínimo del LevelFilter es config.level.
-        let mut builder = LoggerBuilder::new().level(config.level);
+        let mut builder = Self {
+            level_filter: Some(Arc::new(LevelFilter::new(config.level))),
+            extra_filters: vec![],
+            sinks: vec![],
+        };
         for sink_cfg in &config.sinks {
             match sink_cfg {
                 SinkConfig::Console => {
@@ -518,9 +557,10 @@ El test **TDD-14** del Sprint 1 (`logger_log_evalua_mensaje_via_closure`) verifi
 
 #### 3.4 Sin `panic!` (R36)
 
-- Ningún `unwrap()`, `expect()` o `panic!()` en `src/domain/`, `src/ports/`, `src/app/`. Verificable con:
-  ```
-  ! grep -rE "\b(unwrap|expect|panic!)\b" src/domain src/ports src/app
+- Ningún `unwrap()`, `expect()` o `panic!()` en `src/domain/`, `src/ports/`, `src/app/`. Verificable con (excluyendo tests):
+  ```bash
+  ! ( grep -rE "\b(unwrap|expect|panic!)\b" src/ \
+      | grep -vE "mod tests|#\[cfg\(test\)\]" )
   ```
 - En `src/adapters/`, los `unwrap` están **prohibidos** salvo justificación inline. La única excepción documentada en este sprint es el `expect("Mutex poisoned")` dentro de `ConsoleSink::write`/`flush`, que recupera envenenamiento vía `into_inner()` (ver `Logger::record_error`) — esto NO es un `unwrap`, es recuperación explícita.
 - Errores de I/O en adaptadores se convierten en `LogError::Write`. Errores de configuración en `LogError::Config`.
@@ -743,7 +783,7 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 - [ ] `cargo build` sin warnings con `#![deny(warnings)]` en `src/lib.rs`
 - [ ] `cargo test` con los **20 tests TDD del Sprint 1** en verde (lista cerrada, ver Anexo)
 - [ ] `cargo clippy --all-targets -- -D warnings` sin warnings
-- [ ] `grep -rE "\b(unwrap|expect|panic!)\b" src/domain src/ports src/app` devuelve **vacío**
+- [ ] `! ( grep -rE "\b(unwrap|expect|panic!)\b" src/ | grep -vE "mod tests|#\[cfg\(test\)\]" )` devuelve **vacío** (no hay panics/unwraps en prod)
 - [ ] `Logger::default().info("hola")` ejecuta sin `panic!` y, con un `ConsoleSink` redirigido a un `Vec<u8>`, produce una línea que comienza con `[INFO] ` seguida de `hola` y un `\n` (test 19, smoke)
 - [ ] Test 14 (`logger_log_evalua_mensaje_via_closure`) verifica con un `Cell<u32>` que la closure **no** se invoca cuando `LevelFilter` rechaza el nivel
 - [ ] Test 17 (`console_sink_escribe_con_formatter_inyectado`) usa `ConsoleSink::with_writer` con un `Arc<Mutex<Vec<u8>>>` y verifica los bytes escritos
@@ -771,7 +811,7 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 
 > Esta lista es **el** criterio de cierre. Si un test no está, el sprint no está cerrado.
 > Numeración y trazabilidad a V0 entre paréntesis.
-> Tras la iteración 2: tests 9, 10, 11, 12, 17, 19 ajustados a la nueva arquitectura (Sink posee su Formatter; `Filter::enabled` toma `Metadata` por valor; `Metadata::new` existe; `LevelFilter` API especificada; `last_error` poblado en test 16).
+> Tras la iteración 3: tests 9, 10, 11, 12, 17, 19 ajustados a la nueva arquitectura (Sink posee su Formatter; `Filter::enabled` toma `Metadata` por valor; `Metadata::new` existe; `LevelFilter` API especificada; `last_error` poblado en test 16; test 19 usa la API pública del Builder).
 
 ### Bloque A — Dominio puro (8 tests)
 
@@ -805,7 +845,7 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 
 ### Bloque E — Smoke / integración (2 tests)
 
-19. `logger_default_emite_a_writer_capturado` (R39, R5) — se construye un `Logger` con `ConsoleSink::with_writer` y `SimpleTextFormatter`, se llama a `logger.info("hola")`, y se verifica el `Vec<u8>` contiene una línea que comienza con `[INFO] hola` y termina en `\n`. (Qwen M1: el antiguo `console_sink_prints` sin assert queda reemplazado por esta versión con assert real).
+19. `logger_default_emite_a_writer_capturado` (R39, R5) — se construye un `Logger` a través del `LoggerBuilder` público con `ConsoleSink::with_writer` y `SimpleTextFormatter`, se llama a `logger.info("hola")`, y se verifica el `Vec<u8>` contiene una línea que comienza con `[INFO] hola` y termina en `\n` sin emitir a `stdout` gracias al aislamiento del Builder (Bug #2 corregido de raíz).
 20. `smoke_test_default_no_panica_con_multiples_logs` (R36, R19) — test de integración en `tests/smoke.rs`, varios niveles, varios logs, sin panic; verificable en paralelo con `--test-threads=4`.
 
 ### Compatibilidad con API del prototipo
@@ -859,6 +899,19 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 ## Historial de revisión
 
 > Bloque nuevo, no presente en el template original. Rastreo de iteraciones de revisión mientras el ADR está abierto. Se conserva al cerrar el ADR.
+
+### Iteración 3 — 2026-06-25 (aprobación definitiva y rediseño de agy-desktop)
+
+**Veredicto final**: "**APROBADO DEFINITIVO** tras resolver de raíz los Bugs #1 y #2 en el Builder, e implementar el Ajuste #3 en `record_error`."
+
+**Cambios incorporados en esta iteración**:
+
+| ID | Tipo | Cambio | Secciones afectadas |
+|---|---|---|---|
+| **A** | 🔴 Corrección de diseño | `LoggerBuilder` almacena `level_filter` y `sinks` de forma aislada, resolviendo defaults en `.build()`. Evita la acumulación de filtros conflictivos. | §1.6 |
+| **B** | 🔴 Corrección de diseño | Al añadir un sink en `LoggerBuilder`, este ya no hereda la consola stdout por defecto, aislando el test 19 y permitiendo configuraciones limpias a través de la API pública. | §1.6, Anexo (test 19) |
+| **C** | 🟡 Robustecimiento | `record_error` recupera el mutex envenenado, preservando el error anterior y volcándolo a `stderr` antes de guardar el nuevo error. | §1.3, §1.5 |
+| **D** | 🟢 Coherencia | El criterio de validación de `unwrap/expect/panic!` excluye los bloques de test (`mod tests`). | §3.4, Criterio |
 
 ### Iteración 2 — 2026-06-09 (revisión final Qwen)
 
