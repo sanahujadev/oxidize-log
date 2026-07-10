@@ -53,6 +53,8 @@ impl Sink for ConsoleSink {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::expect_used)]
     use super::*;
     use crate::domain::level::LogLevel;
     use crate::domain::event::Metadata;

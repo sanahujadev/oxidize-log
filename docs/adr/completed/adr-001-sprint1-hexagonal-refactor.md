@@ -782,8 +782,7 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 
 - [ ] `cargo build` sin warnings con `#![deny(warnings)]` en `src/lib.rs`
 - [ ] `cargo test` con los **20 tests TDD del Sprint 1** en verde (lista cerrada, ver Anexo)
-- [ ] `cargo clippy --all-targets -- -D warnings` sin warnings
-- [ ] `! ( grep -rE "\b(unwrap|expect|panic!)\b" src/ | grep -vE "mod tests|#\[cfg\(test\)\]" )` devuelve **vacío** (no hay panics/unwraps en prod)
+- [ ] `cargo clippy --all-targets -- -D warnings` pasa **limpio** (incluye el deny de `clippy::unwrap_used` y `clippy::expect_used` configurado en `lib.rs` con `allow` en `mod tests`). El grep anterior está **jubilado** — clippy es el único criterio de verificación de "sin panic/unwrap/expect en producción".
 - [ ] `Logger::default().info("hola")` ejecuta sin `panic!` y, con un `ConsoleSink` redirigido a un `Vec<u8>`, produce una línea que comienza con `[INFO] ` seguida de `hola` y un `\n` (test 19, smoke)
 - [ ] Test 14 (`logger_log_evalua_mensaje_via_closure`) verifica con un `Cell<u32>` que la closure **no** se invoca cuando `LevelFilter` rechaza el nivel
 - [ ] Test 17 (`console_sink_escribe_con_formatter_inyectado`) usa `ConsoleSink::with_writer` con un `Arc<Mutex<Vec<u8>>>` y verifica los bytes escritos
@@ -899,6 +898,23 @@ Apertura (creación) de **PDR-001 (workspace split)** al cierre de Sprint 1, con
 ## Historial de revisión
 
 > Bloque nuevo, no presente en el template original. Rastreo de iteraciones de revisión mientras el ADR está abierto. Se conserva al cerrar el ADR.
+
+### Iteración 4 — 2026-07-10 (criterio de cierre: grep → clippy)
+
+**Origen**: tras la implementación, se detectó que el criterio de cierre Iteración 3
+(grep con `grep -vE "mod tests|..."`) **no funciona como filtro line-based**.
+Reportaba falsos positivos en `unwrap()` legítimos dentro de bloques `mod tests`.
+
+**Cambio**: el criterio del ítem 4 del Criterio de implementación completa
+**se reemplaza por "clippy pasa"**. Configuración efectiva:
+
+- `src/lib.rs`: `#![deny(warnings)] #![deny(clippy::unwrap_used)] #![deny(clippy::expect_used)]`
+- Cada `mod tests`: `#![allow(clippy::unwrap_used)] #![allow(clippy::expect_used)]`
+- Verificación: `cargo clippy --all-targets -- -D warnings` debe pasar limpio.
+
+**Justificación**: clippy es lint a nivel de compilador, **entiende bloques
+Rust**, y `deny` lo trata como error. El grep era heurístico y propenso a
+falsos positivos. Iteración 4 lo jubila formalmente.
 
 ### Iteración 3 — 2026-06-25 (aprobación definitiva y rediseño de agy-desktop)
 

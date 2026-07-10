@@ -77,6 +77,8 @@ impl Default for Logger {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::expect_used)]
     use super::*;
     use std::cell::Cell;
     use crate::app::level_filter::LevelFilter;
@@ -152,9 +154,25 @@ mod tests {
 
     #[test]
     fn logger_default_usa_consola_texto_y_info() {
-        let logger = Logger::default();
-        // Just checking that it works and does not panic
+        use std::io::Write;
+        use crate::adapters::{console::ConsoleSink, text_format::SimpleTextFormatter};
+        use crate::app::config::LoggerBuilder;
+
+        let written_data = Arc::new(Mutex::new(Vec::new()));
+        let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn Write + Send + Sync>));
+        let formatter = Arc::new(SimpleTextFormatter);
+        let sink = Arc::new(ConsoleSink::with_writer(formatter, writer));
+
+        // API pública: añadir un sink reemplaza el default ConsoleSink(stdout).
+        let logger = LoggerBuilder::new().sink(sink).build();
+
         logger.info(|| "hello from default logger".to_string());
+
+        let data = written_data.lock().unwrap();
+        assert_eq!(
+            std::str::from_utf8(&data).unwrap(),
+            "[INFO] hello from default logger\n"
+        );
     }
 
     // Helper wrapper so we can inspect what was written in test 19

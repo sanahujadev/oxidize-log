@@ -1,4 +1,6 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 pub mod domain;
 pub mod ports;
 pub mod adapters;

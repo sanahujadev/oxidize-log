@@ -11,6 +11,7 @@ if [ -z "$1" ]; then
   echo "Entornos disponibles:"
   echo "  dev          - Levanta el servidor de desarrollo con watch"
   echo "  test         - Ejecuta los tests unitarios y de integración"
+  echo "  clippy       - Ejecuta clippy (linter) para validar calidad"
   echo "  debug        - Ejecuta solo los tests marcados como 'debug'"
   echo "  hash         - Ejecuta solo los tests marcados como 'hash'"
   echo "  staging      - Levanta el servidor de como si fuese el de produccion incluyendo tests automaticos"
@@ -26,6 +27,8 @@ elif [ "$1" = "test" ]; then
   SUFFIX="test"
 elif [ "$1" = "ci" ]; then
   SUFFIX=" test && cargo run --example test"
+elif [ "$1" = "clippy" ]; then
+  SUFFIX="--version && cargo clippy --all-targets -- -D warnings"
 else
   echo "Error: Entorno '$1' no reconocido."
   echo "Entornos disponibles: dev, test, ci"
