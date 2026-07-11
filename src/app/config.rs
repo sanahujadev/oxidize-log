@@ -65,7 +65,7 @@ impl LoggerBuilder {
 
         // Resolver sinks (R39: ConsoleSink por defecto si la lista está vacía)
         let sinks = if self.sinks.is_empty() {
-            vec![Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter))) as Arc<dyn Sink>]
+            vec![Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter::new()))) as Arc<dyn Sink>]
         } else {
             self.sinks
         };
@@ -89,7 +89,7 @@ impl LoggerBuilder {
         for sink_cfg in &config.sinks {
             match sink_cfg {
                 SinkConfig::Console => {
-                    builder = builder.sink(Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter))));
+                    builder = builder.sink(Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter::new()))));
                 }
             }
         }

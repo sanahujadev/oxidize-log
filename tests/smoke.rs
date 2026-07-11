@@ -22,7 +22,7 @@ impl Write for VecWriter {
 fn smoke_test_default_no_panica_con_multiples_logs() {
     let written_data = Arc::new(Mutex::new(Vec::new()));
     let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn Write + Send + Sync>));
-    let formatter = Arc::new(SimpleTextFormatter);
+    let formatter = Arc::new(SimpleTextFormatter::new());
     let sink = Arc::new(ConsoleSink::with_writer(formatter, writer));
 
     let logger = LoggerBuilder::new().sink(sink).build();
