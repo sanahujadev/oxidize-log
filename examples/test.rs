@@ -1,24 +1,30 @@
-use oxidize_log::{Logger, LoggerConfig, LogLevel, SinkConfig};
+use oxidize_log::{
+    debug, error, fatal, info, trace, warn, ConsoleSink, JsonFormatter, Logger, LoggerBuilder,
+    LogLevel,
+};
+use std::sync::Arc;
 
 fn main() {
-    // Inicializar el logger global usando Logger::default() como se pide en el refactor
+    // 1. Demostración del Logger por defecto con COLORES y MACROS
     let logger = Logger::default();
 
-    // Probar varios logs usando los helpers
-    logger.trace(|| "Trace message".to_string());
-    logger.debug(|| "Debug message".to_string());
-    logger.info(|| "Hola desde oxidize-log inicializado de forma manual".to_string());
-    logger.warn(|| "Warning message".to_string());
-    logger.error(|| "Error message".to_string());
-    logger.fatal(|| "Fatal message".to_string());
+    println!("--- Salida con Colores (SimpleTextFormatter) ---");
+    trace!(&logger, "Mensaje de rastro oculto (no se verá porque el default es INFO)");
+    debug!(&logger, "Mensaje de debug oculto");
+    info!(&logger, "¡Hola desde oxidize-log! El nivel INFO se ve verde");
+    warn!(&logger, "Cuidado, esto es una advertencia (amarillo)");
+    error!(&logger, "Ocurrió un error grave (rojo)");
+    fatal!(&logger, "Falla crítica en el sistema (rojo sobre blanco)");
 
-    // Probando inicialización de config manual preservada
-    let config = LoggerConfig {
-        level: LogLevel::Debug,
-        colors: true,
-        sinks: vec![SinkConfig::Console],
-    };
+    // 2. Demostración del Formateador JSON
+    let json_sink = Arc::new(ConsoleSink::new(Arc::new(JsonFormatter::default())));
+    let json_logger = LoggerBuilder::new()
+        .level(LogLevel::Debug) // Bajamos el nivel para ver el debug
+        .sink(json_sink)
+        .build();
 
-    let logger_config = Logger::init(config);
-    logger_config.debug(|| "Hola desde logger_config".to_string());
+    println!("\n--- Salida con Formato JSON (RFC 8259 estricto) ---");
+    debug!(&json_logger, "Procesando request #12345");
+    info!(&json_logger, "El usuario {} se ha logueado exitosamente", "zitrojj");
+    error!(&json_logger, "JSON escapa caracteres raros: comillas \", saltos \n y nulos \x00");
 }

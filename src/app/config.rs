@@ -20,6 +20,8 @@ pub struct LoggerBuilder {
     /// se inyecta `ConsoleSink::new(SimpleTextFormatter)` por defecto (R39).
     /// Cualquier `.sink()` añade, y se respeta la lista del usuario.
     sinks: Vec<Arc<dyn Sink>>,
+    /// Habilita o deshabilita los colores en el formateador por defecto.
+    colors_enabled: bool,
 }
 
 impl LoggerBuilder {
@@ -29,6 +31,7 @@ impl LoggerBuilder {
             level_filter: None,
             extra_filters: vec![],
             sinks: vec![],
+            colors_enabled: true,
         }
     }
 
@@ -50,25 +53,42 @@ impl LoggerBuilder {
         self
     }
 
+    /// Habilita o deshabilita los colores en el formateador por defecto.
+    ///
+    /// **Importante**: Este método sólo afecta al formateador por defecto
+    /// que construye el builder en `.build()`. Si se inyecta un sink
+    /// personalizado mediante `.sink()`, esta opción no tiene efecto.
+    pub fn colors(mut self, enabled: bool) -> Self {
+        self.colors_enabled = enabled;
+        self
+    }
+
+    fn build_default_formatter(&self) -> Arc<dyn crate::ports::Formatter> {
+        if self.colors_enabled {
+            Arc::new(SimpleTextFormatter::with_colors(crate::adapters::ColorScheme::default()))
+        } else {
+            Arc::new(SimpleTextFormatter::new())
+        }
+    }
+
     pub fn build(self) -> Logger {
+        // Resolver sinks (R39: ConsoleSink por defecto si la lista está vacía)
+        // Se resuelve antes de los filtros para evitar borrow error después de mover extra_filters
+        let sinks = if self.sinks.is_empty() {
+            let formatter = self.build_default_formatter();
+            vec![Arc::new(ConsoleSink::new(formatter)) as Arc<dyn Sink>]
+        } else {
+            self.sinks
+        };
+
         // Resolver level_filter (R39: Info por defecto)
         let level_filter = self.level_filter
             .unwrap_or_else(|| Arc::new(LevelFilter::new(LogLevel::Info)));
 
         // Componer la lista de filtros: level primero, extras después.
-        // `Logger::log` evalúa con `.all()`, así que el orden no afecta
-        // la decisión final, pero ponemos el nivel primero porque es
-        // el caso más común de fast-path.
         let mut filters = Vec::with_capacity(1 + self.extra_filters.len());
         filters.push(level_filter);
         filters.extend(self.extra_filters);
-
-        // Resolver sinks (R39: ConsoleSink por defecto si la lista está vacía)
-        let sinks = if self.sinks.is_empty() {
-            vec![Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter::new()))) as Arc<dyn Sink>]
-        } else {
-            self.sinks
-        };
 
         Logger {
             filters,
@@ -85,11 +105,13 @@ impl LoggerBuilder {
             level_filter: Some(Arc::new(LevelFilter::new(config.level))),
             extra_filters: vec![],
             sinks: vec![],
+            colors_enabled: config.colors,
         };
         for sink_cfg in &config.sinks {
             match sink_cfg {
                 SinkConfig::Console => {
-                    builder = builder.sink(Arc::new(ConsoleSink::new(Arc::new(SimpleTextFormatter::new()))));
+                    let formatter = builder.build_default_formatter();
+                    builder = builder.sink(Arc::new(ConsoleSink::new(formatter)));
                 }
             }
         }
@@ -166,5 +188,31 @@ mod tests {
         assert_eq!(cfg.level, LogLevel::Warn);
         assert!(!cfg.colors);
         assert_eq!(cfg.sinks, vec![SinkConfig::Console]);
+    }
+
+    #[test]
+    fn builder_colors_by_default_true() {
+        let builder = LoggerBuilder::new();
+        assert!(builder.colors_enabled);
+    }
+
+    #[test]
+    fn builder_colors_setter_updates_field() {
+        let builder = LoggerBuilder::new().colors(false);
+        assert!(!builder.colors_enabled);
+        
+        let builder_on = LoggerBuilder::new().colors(true);
+        assert!(builder_on.colors_enabled);
+    }
+
+    #[test]
+    fn builder_from_config_sets_colors_enabled() {
+        let cfg_dev = LoggerConfig::from_env(Environment::Dev);
+        let builder_dev = LoggerBuilder::from_config(cfg_dev);
+        assert!(builder_dev.colors_enabled);
+
+        let cfg_prod = LoggerConfig::from_env(Environment::Prod);
+        let builder_prod = LoggerBuilder::from_config(cfg_prod);
+        assert!(!builder_prod.colors_enabled);
     }
 }

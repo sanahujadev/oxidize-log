@@ -1,4 +1,4 @@
-use oxidize_log::{LoggerBuilder, ConsoleSink, SimpleTextFormatter};
+use oxidize_log::{LoggerBuilder, ConsoleSink, SimpleTextFormatter, JsonFormatter};
 use std::sync::{Arc, Mutex};
 use std::io::Write;
 use std::thread;
@@ -67,4 +67,47 @@ fn smoke_test_default_no_panica_con_multiples_logs() {
              + output.matches("error 2").count() + output.matches("error 3").count(), 4);
     assert_eq!(output.matches("fatal 0").count() + output.matches("fatal 1").count()
              + output.matches("fatal 2").count() + output.matches("fatal 3").count(), 4);
+}
+
+#[test]
+fn smoke_color_and_json_combined() {
+    let written_data = Arc::new(Mutex::new(Vec::new()));
+    let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn Write + Send + Sync>));
+    let formatter = Arc::new(JsonFormatter::new());
+    let sink = Arc::new(ConsoleSink::with_writer(formatter, writer));
+
+    let logger = LoggerBuilder::new().sink(sink).build();
+    logger.info(|| "integration test message".to_string());
+
+    let data = written_data.lock().expect("Mutex poisoned");
+    let output = std::str::from_utf8(&data).expect("UTF-8 válido");
+
+    let parsed: serde_json::Value = serde_json::from_str(output).expect("Must be valid JSON");
+    assert!(parsed.is_object());
+    assert_eq!(parsed.get("message").and_then(|v| v.as_str()), Some("integration test message"));
+}
+
+#[test]
+fn smoke_macros_capture_real_metadata() {
+    use oxidize_log::info;
+    use oxidize_log::LogLevel;
+
+    let written_data = Arc::new(Mutex::new(Vec::new()));
+    let writer = Arc::new(Mutex::new(Box::new(VecWriter { data: written_data.clone() }) as Box<dyn Write + Send + Sync>));
+    let formatter = Arc::new(JsonFormatter::new());
+    let sink = Arc::new(ConsoleSink::with_writer(formatter, writer));
+
+    let logger = LoggerBuilder::new()
+        .level(LogLevel::Info)
+        .sink(sink)
+        .build();
+
+    info!(&logger, "smoke test message");
+
+    let data = written_data.lock().expect("Mutex poisoned");
+    let output = std::str::from_utf8(&data).expect("UTF-8 válido");
+
+    let parsed: serde_json::Value = serde_json::from_str(output).expect("Must be valid JSON");
+    assert_eq!(parsed.get("module").and_then(|v| v.as_str()), Some("smoke"));
+    assert_eq!(parsed.get("file").and_then(|v| v.as_str()), Some("tests/smoke.rs"));
 }

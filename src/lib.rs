@@ -5,6 +5,7 @@ pub mod domain;
 pub mod ports;
 pub mod adapters;
 pub mod app;
+pub mod macros;
 
 pub use domain::{LogLevel, LogEvent, Metadata, LogError};
 pub use ports::{Sink, Formatter, Filter};
